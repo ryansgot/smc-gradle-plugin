@@ -2,6 +2,8 @@ package com.fsryan.gradle.smc
 
 import org.gradle.api.*
 import org.gradle.api.plugins.*
+import org.gradle.internal.impldep.com.esotericsoftware.minlog.Log
+
 import java.util.zip.*
 
 class SmcPlugin implements Plugin<Project> {
@@ -16,33 +18,35 @@ class SmcPlugin implements Plugin<Project> {
 
         project.extensions.create("smc", SmcExtension)
 
-        project.task('smcGenerate') << {
-            if (!isCompatible(project)) {
-                throw new IllegalStateException("Your project must be applying the java, com.android.application, or com.android.library plugins")
-            }
-            println project.smc.smcUri
-
-            boolean smcUriUndefined = project.smc.smcUri == null
-            boolean smcJarFileDoesNotExist = !smcUriUndefined && !file(project.smc.smcUri).exists
+        project.task('smcDownload') << {
             String libsDirectory = project.smc.libsDirectory
+            boolean shouldExtractSmcJar = definedSmcUriInvalid(project)
             boolean extractStatemapJar = project.smc.putStatemapJarOnClasspath && !new File(libsDirectory + File.separator + 'statemap.jar').exists()
-            if (smcUriUndefined || smcJarFileDoesNotExist || extractStatemapJar) {
+            if (shouldExtractSmcJar || extractStatemapJar) {
                 String buildDir = project.buildDir.absolutePath
-                unzipZip(smcUriUndefined || smcJarFileDoesNotExist, buildDir, extractStatemapJar, libsDirectory)
-            } else {
-                println "executing state machine generation using Smc.jar: " + project.smc.smcUri
+                unzipZip(shouldExtractSmcJar, buildDir, extractStatemapJar, libsDirectory)
             }
         }
-    }
 
-    private static boolean isCompatible(Project project) {
-        PluginContainer pc = project.plugins
-        return pc.hasPlugin('java') || pc.hasPlugin('com.android.application') || pc.hasPlugin('com.android.library')
+        project.task('smcGenerate') << {
+            String smcJarFile = definedSmcUriInvalid(project) ? project.buildDir.absolutePath + File.separator + "Smc.jar" : new File(new URI(project.smc.smcUri).path)
+            project.sourceSets.all { ss ->
+                println ss
+                ss.java.srcDirs.each { dir ->
+                    new SmCompiler(dir, smcJarFile, project.smc.smSrcDir, project.buildDir, project.smc.generateDotFile, project.smc.generateHtmlTable).execute()
+                }
+            }
+        }
+
+        project.getTasksByName('smcGenerate', false).each { t ->
+            t.dependsOn('smcDownload')
+        }
     }
 
     private static void unzipZip(boolean extractSmcJar, String buildDir, boolean extractStatemapJar, String statemapJarDestinationDir) {
         int numFilesToExtract = extractSmcJar && extractStatemapJar ? 2 : extractSmcJar || extractStatemapJar ? 1 : 0
         if (numFilesToExtract == 0) {
+            println "Nothing to do"
             return
         }
 
@@ -96,6 +100,19 @@ class SmcPlugin implements Plugin<Project> {
         File outputDir = new File(builtDirectory.toString())
         return outputDir.isDirectory() || outputDir.mkdirs()
     }
+
+    private static boolean definedSmcUriInvalid(Project project) {
+        if (project.smc.smcUri == null) {
+            return true
+        }
+        URI smcUri = new URI(project.smc.smcUri)
+        if (smcUri.scheme.equals("http") || smcUri.scheme.equals("https")) {
+            //TODO: download somewhere
+        } else if (smcUri.scheme.equals("file")) {
+            return !new File(smcUri.path).exists()
+        }
+        throw new Exception("Only http, https, and file schemes are supported for smcUri")
+    }
 }
 
 class SmcExtension {
@@ -117,7 +134,7 @@ class SmcExtension {
      *          </li>
      *      </ol>
      *      But this is mainly for continuous integration builds, in order to make no additional
-     *      assumptions about the machine on which this plugin is running.
+     *      assumptions about the setup of the machine on which it's running
      * </p>
      * <p>
      *     In order have more efficient local builds, you should:
@@ -160,5 +177,121 @@ class SmcExtension {
      */
     String libsDirectory = "libs"
 
-    String smSource = "sm"
+    /**
+     * <p>
+     *     Defaults to "sm". This directory is relative to each of your source sets. For example, the default
+     *     source set 'main' would have main->java and main->sm. Equivalently, you can have test->sm or
+     *     debug->sm or release->sm.
+     * </p>
+     * <p>
+     *     You should not configure sm as a property of any sourceSet. The plugin just assumes that, as source,
+     *     your state machine's DSL files could be treated just like any other source in your gradle build.
+     * </p>
+     * <p>
+     *     Your state machine's DSL file should be in a directory in keeping with the java package structure. So
+     *     if you want to have MyStateMachine.java generated in the com.my.state.machine package of the main java
+     *     source set, then you need to your state machine DSL, by default, must be in this file:
+     *     src/main/sm/com/my/state/machine/MyStateMachine.sm
+     * </p>
+     */
+    String smSrcDir = "sm"
+
+    /**
+     * <p>
+     *     Defaults to false. If you want to generate the .dot (graphviz) file in your ${buildDir}/outputs/${smSrcDir}
+     *     directory so that you can generate graphs using the graphviz application, then flip this to true.
+     * </p>
+     * <p>
+     *     Installation of graphviz is system-dependent. Therefore, no attempt is made to transform this .dot file
+     *     into a .png or .pdf . . . yet.
+     * </p>
+     */
+    boolean generateDotFile = false
+
+    /**
+     * <p>
+     *     Defaults to false. If you want to generate the .html ile in your ${buildDir}/outputs/${smSrcDir}
+     *     directory so that you can view a table of all the states, actions, transitions, and guards in your browser,
+     *     then flip this to true
+     * </p>
+     */
+    boolean generateHtmlTable = false
+}
+
+class SmCompiler {
+
+    private File srcDir
+    private String smcJarFile
+    private String smSrcDir
+    private File buildDir
+    private boolean generateDotFile
+    private boolean generateHtmlTable
+
+    SmCompiler(File srcDir, String smcJarFile, String smSrcDir, File buildDir, boolean generateDotFile, boolean generateHtmlTable) {
+        this.srcDir = srcDir
+        this.smcJarFile = smcJarFile
+        this.smSrcDir = smSrcDir
+        this.buildDir = buildDir
+        this.generateDotFile = generateDotFile
+        this.generateHtmlTable = generateHtmlTable
+    }
+
+    void execute() {
+        String baseDir = srcDir.absolutePath
+        String searchDir = srcDir.parentFile.absolutePath + File.separator + smSrcDir
+        File searchDirFile = new File(searchDir)
+        if (searchDirFile.exists() && !searchDirFile.isDirectory()) {
+            return
+        }
+
+        try {
+            for (String smFile : new FileNameByRegexFinder().getFileNames(searchDir, /.*\.sm/)) {
+                File outputDir = new File(baseDir + smFile.substring(searchDir.length())).parentFile
+                outputDir.mkdirs()
+                createOutputs(new SmcCommander(smcJarFile, smFile, outputDir.absolutePath, buildDir, smSrcDir))
+            }
+        } catch (FileNotFoundException fnfe) {
+            // TODO: come up with a logging solution
+            fnfe.printStackTrace()
+        }
+    }
+
+    private void createOutputs(SmcCommander commander) {
+        commander.generateStateMachine().execute()
+        if (generateGraphViz) {
+            commander.generateDotFile().execute()
+        }
+        if (generateHtmlTable) {
+            commander.generateHtmlTable().execute()
+        }
+    }
+}
+
+class SmcCommander {
+
+    private String smcJarFile
+    private String inputFile
+    private String javaOutputDir
+    private File buildArtifactsDir
+
+    SmcCommander(String smcJarFile, String inputFile, String javaOutputDir, File buildDir, String artifactDir) {
+        this.smcJarFile = smcJarFile
+        this.inputFile = inputFile
+        this.javaOutputDir = javaOutputDir
+        buildArtifactsDir = new File(buildDir.absolutePath + File.separator + "outputs" + File.separator + artifactDir)
+    }
+
+    String generateStateMachine() {
+        return "java -jar " + smcJarFile + " -java -d " + javaOutputDir + " " + inputFile
+    }
+
+    String generateDotFile() {
+        buildArtifactsDir.mkdirs()
+        return "java -jar " + smcJarFile + " -graph -d " + buildArtifactsDir.absolutePath + " " + inputFile
+    }
+
+    String generateHtmlTable() {
+        buildArtifactsDir.mkdirs()
+        return "java -jar " + smcJarFile + " -table -d " + buildArtifactsDir.absolutePath + " " + inputFile
+    }
 }
