@@ -18,18 +18,24 @@ class SmcPlugin implements Plugin<Project> {
 
         project.extensions.create("smc", SmcExtension)
 
-        project.task('smcDownload') << {
+        // TODO: nail down the actual URI
+
+        project.task('getSmc') << {
             String libsDirectory = project.smc.libsDirectory
-            boolean shouldExtractSmcJar = definedSmcUriInvalid(project)
+            URI smcJarUri = new SmcUriChecker(project.buildDir, project.smc.smcUri).prepareSmcJarURI()
+            boolean shouldExtractSmcJar = true
+            if (smcJarUri != null) {
+                shouldExtractSmcJar = false
+                project.smc.smcUri = smcJarUri.toString()
+            }
             boolean extractStatemapJar = project.smc.putStatemapJarOnClasspath && !new File(libsDirectory + File.separator + 'statemap.jar').exists()
             if (shouldExtractSmcJar || extractStatemapJar) {
-                String buildDir = project.buildDir.absolutePath
-                unzipZip(shouldExtractSmcJar, buildDir, extractStatemapJar, libsDirectory)
+                new Unzipper(project.buildDir, new File(libsDirectory)).unzipZip(shouldExtractSmcJar, extractStatemapJar)
             }
         }
 
-        project.task('smcGenerate') << {
-            String smcJarFile = definedSmcUriInvalid(project) ? project.buildDir.absolutePath + File.separator + "Smc.jar" : new File(new URI(project.smc.smcUri).path)
+        project.task('generateStateMachines') << {
+            String smcJarFile = new File(new URI(project.smc.smcUri).path)
             project.sourceSets.all { ss ->
                 println ss
                 ss.java.srcDirs.each { dir ->
@@ -38,80 +44,9 @@ class SmcPlugin implements Plugin<Project> {
             }
         }
 
-        project.getTasksByName('smcGenerate', false).each { t ->
-            t.dependsOn('smcDownload')
+        project.getTasksByName('generateStateMachines', false).each { t ->
+            t.dependsOn('getSmc')
         }
-    }
-
-    private static void unzipZip(boolean extractSmcJar, String buildDir, boolean extractStatemapJar, String statemapJarDestinationDir) {
-        int numFilesToExtract = extractSmcJar && extractStatemapJar ? 2 : extractSmcJar || extractStatemapJar ? 1 : 0
-        if (numFilesToExtract == 0) {
-            println "Nothing to do"
-            return
-        }
-
-        println "Downloading and unzipping"
-        InputStream dl = new URL(DEFAULT_SMC_URI).openStream()
-        BufferedInputStream bin = new BufferedInputStream(dl)
-        ZipInputStream zin = new ZipInputStream(bin)
-        ZipEntry ze = null
-        int numFilesExtracted = 0
-        while ((ze = zin.getNextEntry()) != null) {
-            if (ze.getName().equals(SMC_JAR_ZIP_ENTRY_NAME) && extractSmcJar) {
-                extractFromZip(zin, ze, buildDir + File.separator + "Smc.jar")
-                numFilesExtracted++
-            }
-            if (ze.getName().equals(STATEMAP_JAR_ZIP_ENTRY_NAME)) {
-                extractFromZip(zin, ze, statemapJarDestinationDir + File.separator + "statemap.jar")
-                numFilesExtracted++
-            }
-            if (numFilesToExtract == numFilesExtracted) {
-                break
-            }
-        }
-        dl.close()
-        bin.close()
-        zin.close()
-    }
-
-    private static void extractFromZip(ZipInputStream zin, ZipEntry ze, String destination) {
-        println "Extracting " + ze.getName() + " into " + destination
-        if (!ensureDirectoryExistsForFile(destination)) {
-            println "Could not make directory for file: " + destination
-        }
-        OutputStream out = new FileOutputStream(destination)
-        byte[] buffer = new byte[8192]
-        int len
-        while ((len = zin.read(buffer)) != -1) {
-            out.write(buffer, 0, len)
-        }
-        out.close()
-    }
-
-    private static boolean ensureDirectoryExistsForFile(String filename) {
-        StringBuilder builtDirectory = new StringBuilder()
-        String[] splitFilename = filename.split(File.separator)
-        for (int i = 0; i < splitFilename.length - 1; i++) {
-            if (i != 0) {
-                builtDirectory.append(File.separator)
-            }
-            builtDirectory.append(splitFilename[i])
-        }
-        File outputDir = new File(builtDirectory.toString())
-        return outputDir.isDirectory() || outputDir.mkdirs()
-    }
-
-    private static boolean definedSmcUriInvalid(Project project) {
-        if (project.smc.smcUri == null) {
-            return true
-        }
-        URI smcUri = new URI(project.smc.smcUri)
-        if (smcUri.scheme.equals("http") || smcUri.scheme.equals("https")) {
-            //TODO: download somewhere
-        } else if (smcUri.scheme.equals("file")) {
-            return !new File(smcUri.path).exists()
-        }
-        throw new Exception("Only http, https, and file schemes are supported for smcUri")
     }
 }
 
@@ -218,6 +153,118 @@ class SmcExtension {
     boolean generateHtmlTable = false
 }
 
+class SmcUriChecker {
+
+    private File buildDir
+    private URI smcUri
+
+    SmcUriChecker(File buildDir, String smcUriStr) {
+        this.buildDir = buildDir
+        smcUri = smcUriStr == null ? null : new URI(smcUriStr)
+    }
+
+    URI prepareSmcJarURI() {
+        if (smcUri == null) {
+            return null
+        }
+
+        if ((smcUri.scheme.equals("http") || smcUri.scheme.equals("https")) && downloadToBuildDir()) {
+            return new URI("file://" + downloadDestinationPath())
+        } else if (smcUri.scheme.equals("file")) {
+            return new File(smcUri.path).exists() ? smcUri : null
+        }
+
+        // TODO: warn user that the configured smcUri is not of correct type or something
+        return null
+    }
+
+    private boolean downloadToBuildDir() {
+        // TODO: warn downloading
+        try {
+            def smcJarFile = new File(downloadDestinationPath()).newOutputStream()
+            smcJarFile << smcUri.toURL().openStream()
+            smcJarFile.close()
+        } catch (Exception e) {
+            // TODO: error that download failed
+            return false
+        }
+        return true
+    }
+
+    private String downloadDestinationPath() {
+        return buildDir.absolutePath + File.separator + "Smc.jar"
+    }
+}
+
+class Unzipper {
+
+    private File buildDir
+    private File statemapJarDestinationDir
+
+    Unzipper(File buildDir, File statemapJarDestinationDir) {
+        this.buildDir = buildDir
+        this.statemapJarDestinationDir = statemapJarDestinationDir
+    }
+
+    void unzipZip(boolean extractSmcJar, boolean extractStatemapJar) {
+        int numFilesToExtract = extractSmcJar && extractStatemapJar ? 2 : extractSmcJar || extractStatemapJar ? 1 : 0
+        if (numFilesToExtract == 0) {
+            println "Nothing to do"
+            return
+        }
+
+        println "Downloading and unzipping"
+        InputStream dl = new URL(SmcPlugin.DEFAULT_SMC_URI).openStream()
+        BufferedInputStream bin = new BufferedInputStream(dl)
+        ZipInputStream zin = new ZipInputStream(bin)
+        ZipEntry ze = null
+        int numFilesExtracted = 0
+        while ((ze = zin.getNextEntry()) != null) {
+            if (ze.getName().equals(SmcPlugin.SMC_JAR_ZIP_ENTRY_NAME) && extractSmcJar) {
+                extractFromZip(zin, ze, buildDir.absolutePath + File.separator + "Smc.jar")
+                numFilesExtracted++
+            }
+            if (ze.getName().equals(SmcPlugin.STATEMAP_JAR_ZIP_ENTRY_NAME)) {
+                extractFromZip(zin, ze, statemapJarDestinationDir.absolutePath + File.separator + "statemap.jar")
+                numFilesExtracted++
+            }
+            if (numFilesToExtract == numFilesExtracted) {
+                break
+            }
+        }
+        dl.close()
+        bin.close()
+        zin.close()
+    }
+
+    private void extractFromZip(ZipInputStream zin, ZipEntry ze, String destination) {
+        println "Extracting " + ze.getName() + " into " + destination
+        if (!ensureDirectoryExistsForFile(destination)) {
+            println "Could not make directory for file: " + destination
+        }
+        OutputStream out = new FileOutputStream(destination)
+        byte[] buffer = new byte[8192]
+        int len
+        while ((len = zin.read(buffer)) != -1) {
+            out.write(buffer, 0, len)
+        }
+        out.close()
+    }
+
+    private boolean ensureDirectoryExistsForFile(String filename) {
+        StringBuilder builtDirectory = new StringBuilder()
+        String[] splitFilename = filename.split(File.separator)
+        for (int i = 0; i < splitFilename.length - 1; i++) {
+            if (i != 0) {
+                builtDirectory.append(File.separator)
+            }
+            builtDirectory.append(splitFilename[i])
+        }
+        File outputDir = new File(builtDirectory.toString())
+        return outputDir.isDirectory() || outputDir.mkdirs()
+    }
+}
+
 class SmCompiler {
 
     private File srcDir
@@ -258,7 +305,7 @@ class SmCompiler {
 
     private void createOutputs(SmcCommander commander) {
         commander.generateStateMachine().execute()
-        if (generateGraphViz) {
+        if (generateDotFile) {
             commander.generateDotFile().execute()
         }
         if (generateHtmlTable) {
