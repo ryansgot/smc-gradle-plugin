@@ -22,7 +22,7 @@ class SmcPlugin implements Plugin<Project> {
         project.task('getSmc') << {
             UriChecker smcUriChecker = UriChecker.get(project.buildDir, LOCAL_SMC_JAR_FILENAME, project.smc.smcUri)
             if (smcUriChecker.ok()) {
-                project.smc.smcUri = smcUriChecker.prepareURI().toString()
+                project.smc.smcUri = smcUriChecker.prepareURI(false).toString()
             }
             
             File libsDirectory = new File(project.smc.libsDirectory)
