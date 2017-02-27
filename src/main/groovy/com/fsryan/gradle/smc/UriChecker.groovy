@@ -10,24 +10,34 @@ abstract class UriChecker {
     String outputFilename
     URI uri
 
-    private UriChecker(File outputDir, String outputFilename, URI uri) {
+    Logger logger
+
+    protected UriChecker(File outputDir, String outputFilename, URI uri) {
         this.outputDir = outputDir
         this.outputFilename = outputFilename
         this.uri = uri
+        logger = Logger.getLogger(getClass().getSimpleName())
     }
 
     static UriChecker get(File outputDir, String outputFilename, String smcUriStr) {
-        URI uri = new URI(smcUriStr)
+        URI uri = null
+        try {
+            uri = new URI(smcUriStr)
+        } catch (Exception e) {
+            Logger.getLogger(UriChecker.class.getSimpleName()).log(Level.WARNING, "invalid smcUri: " + smcUriStr + "; will download zip")
+            return new UnsuccessfulUriChecker()
+        }
+
         switch (uri.scheme) {
             case "http":
                 // intentionally falling through
             case "https":
                 return new HttpDownloadUriChecker(outputDir, outputFilename, uri)
             case "file":
-                return FileUriChecker(outputDir, outputFilename, uri)
+                return new FileUriChecker(outputDir, outputFilename, uri)
         }
 
-        Logger.getLogger(UriChecker.class).log(Level.WARNING, "Unsupported smcUri scheme: " + uri.scheme)
+        Logger.getLogger(UriChecker.class.getSimpleName()).log(Level.WARNING, "Unsupported smcUri scheme: " + uri.scheme)
         return new UnsuccessfulUriChecker()
     }
 
@@ -55,7 +65,6 @@ class HttpDownloadUriChecker extends UriChecker {
     }
 
     private boolean downloadToBuildDir() {
-        Logger logger = Logger.getLogger(getClass())
         logger.log(Level.INFO, "Downloading " + uri + " to " + downloadDestinationPath())
         try {
             def smcJarFile = new File(downloadDestinationPath()).newOutputStream()
@@ -81,8 +90,7 @@ class FileUriChecker extends UriChecker {
         super(outputDir, outputFilename, uri)
         ok = uri != null && new File(uri.path).exists()
         if (!ok) {
-            String message = uri == null ? "smcUri was null" : "file " + uri.path + " does not exist"
-            Logger.getLogger(getClass()).log(Level.WARNING, message)
+            logger.log(Level.WARNING, uri == null ? "smcUri was null" : "file " + uri.path + " does not exist")
         }
     }
 
@@ -98,7 +106,7 @@ class FileUriChecker extends UriChecker {
 
     private URI moveResult() {
         File source = new File(uri.path)
-        File destination = new File(outputDir + File.separator + outputFilename)
+        File destination = new File(outputDir.absolutePath + File.separator + outputFilename)
 
         if (source.equals(destination)) {
             return uri
@@ -108,7 +116,7 @@ class FileUriChecker extends UriChecker {
             Files.move(source.toPath(), destination.toPath())
             return destination.toURI()
         } catch (Exception e) {
-            Logger.getLogger(getClass()).log(Level.WARNING, "Could not move " + source + " to " + destination)
+            logger.log(Level.WARNING, "Could not move " + source + " to " + destination)
         }
         return null
     }

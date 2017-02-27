@@ -21,9 +21,9 @@ class SmcCommander {
         return "java -jar " + smcJarFile + " -java -d " + javaOutputDir + " " + inputFile
     }
 
-    String generateDotFile() {
+    String generateDotFile(int level) {
         buildArtifactsDir.mkdirs()
-        return "java -jar " + smcJarFile + " -graph -d " + buildArtifactsDir.absolutePath + " " + inputFile
+        return "java -jar " + smcJarFile + " -graph -glevel " + level + "-d " + buildArtifactsDir.absolutePath + " " + inputFile
     }
 
     String generateHtmlTable() {

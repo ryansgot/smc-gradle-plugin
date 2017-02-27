@@ -7,8 +7,11 @@ import java.util.zip.ZipInputStream
 
 class Unzipper {
 
+    private static Logger logger = Logger.getLogger(Unzipper.class.getSimpleName())
+
     private File buildDir
     private File statemapJarDestinationDir
+
 
     Unzipper(File buildDir, File statemapJarDestinationDir) {
         this.buildDir = buildDir
@@ -16,7 +19,6 @@ class Unzipper {
     }
 
     void execute(boolean extractSmcJar, boolean extractStatemapJar) {
-        Logger logger = Logger.getLogger(getClass())
         int numFilesToExtract = extractSmcJar && extractStatemapJar ? 2 : extractSmcJar || extractStatemapJar ? 1 : 0
         if (numFilesToExtract == 0) {
             logger.log(Level.INFO, "Not executing Zip download; already have necessary dependencies")

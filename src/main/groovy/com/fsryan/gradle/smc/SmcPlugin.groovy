@@ -1,6 +1,7 @@
 package com.fsryan.gradle.smc
 
 import org.gradle.api.*
+import org.gradle.api.tasks.compile.JavaCompile
 
 class SmcPlugin implements Plugin<Project> {
 
@@ -17,8 +18,6 @@ class SmcPlugin implements Plugin<Project> {
 
         project.extensions.create("smc", SmcExtension)
 
-        // TODO: nail down the actual URI
-
         project.task('getSmc') << {
             UriChecker smcUriChecker = UriChecker.get(project.buildDir, LOCAL_SMC_JAR_FILENAME, project.smc.smcUri)
             if (smcUriChecker.ok()) {
@@ -31,7 +30,7 @@ class SmcPlugin implements Plugin<Project> {
                 project.smc.statemapJarUri = statemapUriChecker.prepareURI(true)
             }
             
-            new Unzipper(project.buildDir, new File(libsDirectory)).execute(!smcUriChecker.ok(), !statemapUriChecker.ok())
+            new Unzipper(project.buildDir, libsDirectory).execute(!smcUriChecker.ok(), !statemapUriChecker.ok())
         }
 
         project.task('generateStateMachines') << {
@@ -39,13 +38,18 @@ class SmcPlugin implements Plugin<Project> {
             project.sourceSets.all { ss ->
                 println ss
                 ss.java.srcDirs.each { dir ->
-                    new SmCompiler(dir, smcJarFile, project.smc.smSrcDir, project.buildDir, project.smc.generateDotFile, project.smc.generateHtmlTable).execute()
+                    new SmCompiler(dir, smcJarFile, project.smc.smSrcDir, project.buildDir, project.smc.graphVizLevel, project.smc.outputHtmlTable).execute()
                 }
             }
         }
 
         project.getTasksByName('generateStateMachines', false).each { t ->
             t.dependsOn('getSmc')
+        }
+
+
+        project.tasks.withType(JavaCompile).each { t ->
+            t.dependsOn('generateStateMachines')
         }
     }
 }
