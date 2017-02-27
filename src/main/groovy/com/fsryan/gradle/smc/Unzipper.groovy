@@ -18,14 +18,15 @@ class Unzipper {
         this.statemapJarDestinationDir = statemapJarDestinationDir
     }
 
-    void execute(boolean extractSmcJar, boolean extractStatemapJar) {
+    UnzipSummary execute(boolean extractSmcJar, boolean extractStatemapJar) {
         int numFilesToExtract = extractSmcJar && extractStatemapJar ? 2 : extractSmcJar || extractStatemapJar ? 1 : 0
         if (numFilesToExtract == 0) {
             logger.log(Level.INFO, "Not executing Zip download; already have necessary dependencies")
-            return
+            return new UnzipSummary(null, null);
         }
 
         logger.log(Level.INFO, "Downloading and unzipping")
+        UnzipSummary ret = new UnzipSummary(null, null);
         InputStream dl = new URL(SmcPlugin.DEFAULT_SMC_URI).openStream()
         BufferedInputStream bin = new BufferedInputStream(dl)
         ZipInputStream zin = new ZipInputStream(bin)
@@ -33,11 +34,15 @@ class Unzipper {
         int numFilesExtracted = 0
         while ((ze = zin.getNextEntry()) != null) {
             if (ze.getName().equals(SmcPlugin.SMC_JAR_ZIP_ENTRY_NAME) && extractSmcJar) {
-                extractFromZip(zin, ze, buildDir.absolutePath + File.separator + "Smc.jar")
+                File outFile = new File(buildDir.absolutePath + File.separator + "Smc.jar")
+                extractFromZip(zin, ze, outFile.absolutePath)
+                ret.smcJarUri = outFile.toURI()
                 numFilesExtracted++
             }
             if (ze.getName().equals(SmcPlugin.STATEMAP_JAR_ZIP_ENTRY_NAME) && extractStatemapJar) {
-                extractFromZip(zin, ze, statemapJarDestinationDir.absolutePath + File.separator + "statemap.jar")
+                File outFile = new File(statemapJarDestinationDir.absolutePath + File.separator + "statemap.jar")
+                extractFromZip(zin, ze, outFile.absolutePath)
+                ret.statemapJarUri = outFile.toURI()
                 numFilesExtracted++
             }
             if (numFilesToExtract == numFilesExtracted) {
@@ -47,6 +52,8 @@ class Unzipper {
         dl.close()
         bin.close()
         zin.close()
+
+        return ret
     }
 
     private void extractFromZip(ZipInputStream zin, ZipEntry ze, String destination) {
@@ -74,5 +81,15 @@ class Unzipper {
         }
         File outputDir = new File(builtDirectory.toString())
         return outputDir.isDirectory() || outputDir.mkdirs()
+    }
+}
+
+class UnzipSummary {
+    URI smcJarUri
+    URI statemapJarUri
+
+    UnzipSummary(URI smcJarUri, URI statemapJarUri) {
+        this.smcJarUri = smcJarUri
+        this.statemapJarUri = statemapJarUri
     }
 }

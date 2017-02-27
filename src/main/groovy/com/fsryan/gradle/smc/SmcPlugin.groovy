@@ -30,7 +30,9 @@ class SmcPlugin implements Plugin<Project> {
                 project.smc.statemapJarUri = statemapUriChecker.prepareURI(true)
             }
             
-            new Unzipper(project.buildDir, libsDirectory).execute(!smcUriChecker.ok(), !statemapUriChecker.ok())
+            UnzipSummary unzipSummary = new Unzipper(project.buildDir, libsDirectory).execute(!smcUriChecker.ok(), !statemapUriChecker.ok())
+            project.smc.smcUri = unzipSummary.smcJarUri == null ? project.smc.smcUri : unzipSummary.smcJarUri
+            project.smc.statemapJarUri = unzipSummary.statemapJarUri == null ? project.smc.statemapJarUri : unzipSummary.statemapJarUri
         }
 
         project.task('generateStateMachines') << {
