@@ -57,7 +57,7 @@ class Unzipper {
     }
 
     private void extractFromZip(ZipInputStream zin, ZipEntry ze, String destination) {
-        println "Extracting " + ze.getName() + " into " + destination
+        logger.log(Level.INFO, "Extracting " + ze.getName() + " into " + destination)
         if (!ensureDirectoryExistsForFile(destination)) {
             println "Could not make directory for file: " + destination
         }
