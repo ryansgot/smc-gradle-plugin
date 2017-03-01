@@ -1,44 +1,45 @@
 package com.fsryan.gradle.smc
 
-import java.util.logging.Level
-import java.util.logging.Logger
-
 class SmCompiler {
-
-    private static final Logger logger = Logger.getLogger(SmCompiler.class.simpleName)
 
     private File srcDir
     private String smcJarFile
     private String smSrcDir
-    private File buildDir
+    private SmOutputDirFinder outputDirFinder
     private int graphVizLevel
     private boolean generateHtmlTable
 
-    SmCompiler(File srcDir, String smcJarFile, String smSrcDir, File buildDir, int graphVizLevel, boolean generateHtmlTable) {
+    SmCompiler(File srcDir, String smcJarFile, SmOutputDirFinder outputDirFinder, SmcExtension smc) {
+        this(srcDir, smcJarFile, outputDirFinder, smc.smSrcDir, smc.graphVizLevel, smc.outputHtmlTable)
+    }
+
+    SmCompiler(File srcDir, String smcJarFile, SmOutputDirFinder outputDirFinder, String smSrcDir, int graphVizLevel, boolean generateHtmlTable) {
         this.srcDir = srcDir
         this.smcJarFile = smcJarFile
+        this.outputDirFinder = outputDirFinder
         this.smSrcDir = smSrcDir
-        this.buildDir = buildDir
         this.graphVizLevel = Math.min(2, graphVizLevel)
         this.generateHtmlTable = generateHtmlTable
     }
 
     void execute() {
-        String baseDir = buildDir.absolutePath + File.separator + "generated-src"
         String searchDir = srcDir.parentFile.absolutePath + File.separator + smSrcDir
+
+        println "executing for output dir: " + outputDirFinder.getSrcOutputDir() + "; searchDir = " + searchDir
         File searchDirFile = new File(searchDir)
         if (searchDirFile.exists() && !searchDirFile.isDirectory()) {
+            println "search dir (" + searchDir + ") does not exist"
             return
         }
 
         try {
-            for (String smFile : new FileNameByRegexFinder().getFileNames(searchDir, /.*\.sm/)) {
-                File outputDir = new File(baseDir + smFile.substring(searchDir.length())).parentFile
-                outputDir.mkdirs()
-                createOutputs(new SmcCommander(smcJarFile, smFile, outputDir.absolutePath, buildDir, smSrcDir))
+            List<String> smFiles = new FileNameByRegexFinder().getFileNames(searchDir, /.*\.sm/)
+            println "found .sm files: " + smFiles
+            for (String smFile : smFiles) {
+                createOutputs(new SmcCommander(smcJarFile, smFile, outputDirFinder.getSrcOutputDir(), outputDirFinder.getArtifactOutputDir()))
             }
         } catch (FileNotFoundException fnfe) {
-            logger.log(Level.WARNING, "not found: " + searchDir)
+            println "not found: " + searchDir
         }
     }
 

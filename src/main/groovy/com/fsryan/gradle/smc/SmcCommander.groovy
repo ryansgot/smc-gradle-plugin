@@ -1,33 +1,34 @@
 package com.fsryan.gradle.smc
 
-/**
- * Created by ryan on 2/21/17.
- */
 class SmcCommander {
 
     private String smcJarFile
     private String inputFile
-    private String javaOutputDir
-    private File buildArtifactsDir
+    private File javaOutputDir
+    private File artifactOutputDir
 
-    SmcCommander(String smcJarFile, String inputFile, String javaOutputDir, File buildDir, String artifactDir) {
+    SmcCommander(String smcJarFile, String inputFile, File javaOutputDir, File artifactOutputDir) {
         this.smcJarFile = smcJarFile
         this.inputFile = inputFile
         this.javaOutputDir = javaOutputDir
-        buildArtifactsDir = new File(buildDir.absolutePath + File.separator + "outputs" + File.separator + artifactDir)
+        this.artifactOutputDir = artifactOutputDir
     }
 
     String generateStateMachine() {
-        return "java -jar " + smcJarFile + " -java -d " + javaOutputDir + " " + inputFile
+        String command = "java -jar " + smcJarFile + " -java -d " + javaOutputDir.absolutePath + " " + inputFile
+        println "generate command: " + command
+        return command
     }
 
     String generateDotFile(int level) {
-        buildArtifactsDir.mkdirs()
-        return "java -jar " + smcJarFile + " -graph -glevel " + level + "-d " + buildArtifactsDir.absolutePath + " " + inputFile
+        String command = "java -jar " + smcJarFile + " -graph -glevel " + level + "-d " + artifactOutputDir.absolutePath + " " + inputFile
+        println "generate dot file command: " + command
+        return command
     }
 
     String generateHtmlTable() {
-        buildArtifactsDir.mkdirs()
-        return "java -jar " + smcJarFile + " -table -d " + buildArtifactsDir.absolutePath + " " + inputFile
+        String command = "java -jar " + smcJarFile + " -table -d " + artifactOutputDir.absolutePath + " " + inputFile
+        println "generate html table command: " + command
+        return command
     }
 }

@@ -19,12 +19,12 @@ abstract class UriChecker {
         logger = Logger.getLogger(getClass().getSimpleName())
     }
 
-    static UriChecker get(File outputDir, String outputFilename, String smcUriStr) {
+    static UriChecker get(File outputDir, String outputFilename, String uriStr) {
         URI uri = null
         try {
-            uri = new URI(smcUriStr)
+            uri = new URI(uriStr)
         } catch (Exception e) {
-            Logger.getLogger(UriChecker.class.getSimpleName()).log(Level.WARNING, "invalid smcUri: " + smcUriStr + "; will download zip")
+            Logger.getLogger(UriChecker.class.getSimpleName()).log(Level.WARNING, "invalid uri: " + uriStr + "; will download zip")
             return new UnsuccessfulUriChecker()
         }
 
@@ -37,7 +37,7 @@ abstract class UriChecker {
                 return new FileUriChecker(outputDir, outputFilename, uri)
         }
 
-        Logger.getLogger(UriChecker.class.getSimpleName()).log(Level.WARNING, "Unsupported smcUri scheme: " + uri.scheme)
+        Logger.getLogger(UriChecker.class.getSimpleName()).log(Level.WARNING, "Unsupported uri scheme: " + uri.scheme)
         return new UnsuccessfulUriChecker()
     }
 

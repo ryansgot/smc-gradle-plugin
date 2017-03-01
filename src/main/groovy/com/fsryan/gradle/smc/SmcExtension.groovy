@@ -36,14 +36,11 @@ class SmcExtension {
      *             downloads a zip of the latest smc hosted by sourceforge
      *         </li>
      *         <li>
-     *             unzips it
+     *             extracts the Smc.jar file from the zip and puts it in the bin directory
      *         </li>
      *         <li>
-     *             runs the Smc.jar
+     *             uses extracted Smc.jar file to generate the state machine context
      *         </li>
-     *         <li>
-     *             deletes the zip file and the unzipped directory
-     *          </li>
      *      </ol>
      *      However, this is mainly for out-of-the-box behavior to work properly, and there is no good reason to
      *      continue downloading the zip file for each build
