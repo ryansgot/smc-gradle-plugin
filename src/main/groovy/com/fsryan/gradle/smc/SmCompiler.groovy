@@ -25,7 +25,6 @@ class SmCompiler {
     void execute() {
         String searchDir = srcDir.parentFile.absolutePath + File.separator + smSrcDir
 
-        println "executing for output dir: " + outputDirFinder.getSrcOutputDir() + "; searchDir = " + searchDir
         File searchDirFile = new File(searchDir)
         if (searchDirFile.exists() && !searchDirFile.isDirectory()) {
             println "search dir (" + searchDir + ") does not exist"
@@ -34,9 +33,8 @@ class SmCompiler {
 
         try {
             List<String> smFiles = new FileNameByRegexFinder().getFileNames(searchDir, /.*\.sm/)
-            println "found .sm files: " + smFiles
             for (String smFile : smFiles) {
-                createOutputs(new SmcCommander(smcJarFile, smFile, outputDirFinder.getSrcOutputDir(), outputDirFinder.getArtifactOutputDir()))
+                createOutputs(new SmcCommander(smcJarFile, smFile, javaOutputDir(smFile), outputDirFinder.getArtifactOutputDir()))
             }
         } catch (FileNotFoundException fnfe) {
             println "not found: " + searchDir
@@ -55,5 +53,12 @@ class SmCompiler {
 
     private boolean generateDotFile() {
         return graphVizLevel >= 0
+    }
+
+    private File javaOutputDir(String smFilePath) {
+        File smFileParent = new File(smFilePath).parentFile
+        String packagePath = smFileParent.absolutePath.substring(srcDir.absolutePath.length() - 1)
+        File ret = new File(outputDirFinder.getSrcOutputDir(), packagePath)
+        return ret
     }
 }

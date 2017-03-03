@@ -15,20 +15,23 @@ class SmcCommander {
     }
 
     String generateStateMachine() {
-        String command = "java -jar " + smcJarFile + " -java -d " + javaOutputDir.absolutePath + " " + inputFile
-        println "generate command: " + command
-        return command
+        if (!javaOutputDir.isDirectory() && !javaOutputDir.mkdirs()) {
+            throw new IllegalStateException("could not make directory for generated source output: " + javaOutputDir)
+        }
+        return "java -jar " + smcJarFile + " -java -d " + javaOutputDir.absolutePath + " " + inputFile
     }
 
     String generateDotFile(int level) {
-        String command = "java -jar " + smcJarFile + " -graph -glevel " + level + "-d " + artifactOutputDir.absolutePath + " " + inputFile
-        println "generate dot file command: " + command
-        return command
+        if (!artifactOutputDir.isDirectory() && !artifactOutputDir.mkdirs()) {
+            throw new IllegalStateException("could not make directory for generated artifact output: " + javaOutputDir)
+        }
+        return "java -jar " + smcJarFile + " -graph -glevel " + level + " -d " + artifactOutputDir.absolutePath + " " + inputFile
     }
 
     String generateHtmlTable() {
-        String command = "java -jar " + smcJarFile + " -table -d " + artifactOutputDir.absolutePath + " " + inputFile
-        println "generate html table command: " + command
-        return command
+        if (!artifactOutputDir.isDirectory() && !artifactOutputDir.mkdirs()) {
+            throw new IllegalStateException("could not make directory for generated artifact output: " + javaOutputDir)
+        }
+        return "java -jar " + smcJarFile + " -table -d " + artifactOutputDir.absolutePath + " " + inputFile
     }
 }

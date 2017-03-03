@@ -11,8 +11,7 @@ class Unzipper {
 
     private File buildDir
     private File statemapJarDestinationDir
-
-
+    
     Unzipper(File buildDir, File statemapJarDestinationDir) {
         this.buildDir = buildDir
         this.statemapJarDestinationDir = statemapJarDestinationDir
@@ -72,7 +71,7 @@ class Unzipper {
     private URI extractFromZip(ZipInputStream zin, ZipEntry ze, File outputFile) {
         logger.log(Level.INFO, "Extracting " + ze.getName() + " into " + outputFile)
         if (!outputFile.parentFile.isDirectory() && !outputFile.parentFile.mkdirs()) {
-            println "Could not make directory for file: " + outputFile
+            throw new IllegalStateException("Cannot create directory for output file: " + outputFile)
         }
         OutputStream out = new FileOutputStream(outputFile)
         byte[] buffer = new byte[8192]
