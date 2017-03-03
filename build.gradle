@@ -1,5 +1,10 @@
+plugins {
+    id "com.jfrog.bintray" version "1.7.3"
+}
+
 apply plugin: 'groovy'
 apply plugin: 'maven'
+apply plugin: 'maven-publish'
 
 group 'com.fsryan.gradle.smc'
 version '0.0.1'
@@ -13,4 +18,76 @@ dependencies {
     compile localGroovy()
 
     testCompile 'junit:junit:4.12'
+}
+
+String bintrayUserCredential = hasProperty('bintrayUser') ? getProperty('bintrayUser') : ''
+String bintrayApiKeyCredential = hasProperty('bintrayApiKey') ? getProperty('bintrayApiKey') : ''
+bintray {
+    user = bintrayUserCredential
+    key = bintrayApiKeyCredential
+    publications = ['smcPluginPublication']
+    pkg {
+        repo = 'maven'
+        name = 'smc-gradle-plugin'
+        licenses = ['Mozilla-1.1']
+        vcsUrl = 'https://github.com/ryansgot/smc-gradle-plugin'
+        version {
+            name = '0.0.1'
+            released  = new Date()
+            vcsTag = 'v0.0.1'
+        }
+    }
+}
+
+def pomConfig = {
+    licenses {
+        license {
+            name "Mozilla Public License Version 2.0"
+            url "https://www.mozilla.org/en-US/MPL/2.0/"
+            distribution "repo"
+        }
+    }
+    developers {
+        developer {
+            id "ryansgot"
+            name "Ryan"
+            email "fsryan.developer@gmail.com"
+        }
+    }
+}
+
+publishing {
+    publications {
+        smcPluginPublication(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            groupId 'com.fsryan.gradle.smc'
+            artifactId 'smc'
+            version '0.0.1'
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('description', 'Gradle plugin for the State Machine Compiler (SMC) that makes it easier to use in a gradle project')
+                root.appendNode('name', 'smc-gradle-plugin')
+                root.appendNode('url', 'https://github.com/ryansgot/smc-gradle-plugin')
+                root.children().last() + pomConfig
+            }
+        }
+    }
+}
+
+task release(dependsOn: bintrayUpload) {
+    doLast {
+        println("Huzzah! smc-gradle-plugin was uploaded to bintray!")
+    }
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.groovy.srcDirs
+    classifier = 'sources'
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
 }
