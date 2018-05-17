@@ -7,7 +7,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 group 'com.fsryan.gradle.smc'
-version '0.0.1'
+version '0.0.2'
 
 repositories {
     mavenCentral()
@@ -32,9 +32,9 @@ bintray {
         licenses = ['Mozilla-1.1']
         vcsUrl = 'https://github.com/ryansgot/smc-gradle-plugin'
         version {
-            name = '0.0.1'
+            name = '0.0.2'
             released  = new Date()
-            vcsTag = 'v0.0.1'
+            vcsTag = 'v0.0.2'
         }
     }
 }
@@ -64,7 +64,7 @@ publishing {
             artifact javadocJar
             groupId 'com.fsryan.gradle.smc'
             artifactId 'smc'
-            version '0.0.1'
+            version '0.0.2'
             pom.withXml {
                 def root = asNode()
                 root.appendNode('description', 'Gradle plugin for the State Machine Compiler (SMC) that makes it easier to use in a gradle project')

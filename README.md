@@ -24,5 +24,8 @@ This process is overly-manual when you have tools like gradle that are extensibl
 ## Support
 
 - Android
-- Java (maybe)
+- Java (see known issues below)
 - Groovy (maybe)
+
+## Known Issues
+- In a java project, `./gradlew clean compileJava` results in missing classes at compile time, but `./gradlew clean; ./gradlew compileJava` work as separate commands.
