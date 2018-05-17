@@ -107,6 +107,6 @@ class SmcPlugin implements Plugin<Project> {
     }
 
     private boolean isAndroidProject(Project p) {
-        return p.android != null
+        return p.metaClass.hasProperty(p,'android')
     }
 }
