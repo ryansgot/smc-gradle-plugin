@@ -1,8 +1,5 @@
 package com.fsryan.gradle.smc
 
-/**
- * Created by ryan on 3/3/17.
- */
 class SmOutputDirFinder {
 
     String buildTypeName
