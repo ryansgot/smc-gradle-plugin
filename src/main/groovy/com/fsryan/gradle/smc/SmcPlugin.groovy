@@ -37,6 +37,15 @@ class SmcPlugin implements Plugin<Project> {
             project.smc.statemapJarUri = us.statemapJarUri == null ? project.smc.statemapJarUri : us.statemapJarUri
         }
 
+        if (!isAndroidProject(project)) {
+            retrieveSourceSets(project).all { ss ->
+                // in a plain java project, this does not get added to a source directory by default
+                def generatedSrc = new File(project.buildDir, 'generated-src' + File.separator + 'java')
+                println "adding generated source to source set: $generatedSrc"
+                ss.java.srcDirs += generatedSrc
+            }
+        }
+
         project.afterEvaluate {
             if (!isAndroidProject(project)) {
                 createGenerationTask(project, null)
