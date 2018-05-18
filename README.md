@@ -1,5 +1,5 @@
 # smc-gradle-plugin
-Gradle plugin for the State Machine Compiler (SMC) that makes it easier to use in a gradle project
+Gradle plugin for the State Machine Compiler (SMC) that makes it easier to use in a gradle project. See [SMC Gradle Plugin Examples](https://github.com/ryansgot/smc-gradle-plugin-example) for sample projects.
 
 ## What is the State Machine Compiler?
 The SMC project is hosted on sourceforge here: http://smc.sourceforge.net/. It serves to generate state machine code for you via supplying a DSL. Please see the website for more information.
@@ -26,6 +26,44 @@ This process is overly-manual when you have tools like gradle that are extensibl
 - Android
 - Java (supported--see known issues below)
 - Groovy (maybe)
+
+## Gradle Setup
+Add the following to your root project's build.gradle file:
+```groovy
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.fsryan.gradle.smc:smc:0.0.2'
+    }
+}
+```
+Add the following to your app module's build.gradle file:
+```groovy
+apply plugin: 'com.android.application'  // or 'java' or 'com.android.library'
+apply plugin: 'smc'
+
+/* ... */
+
+smc {
+    // smcUri is the uri where you have put the Smc.jar file on your device.
+    // If you don't have this, or if you configure it wrong, then the SMC download site's version will be downloaded.
+    smcUri = 'file://' + rootProject.projectDir.absolutePath + File.separator + 'bin' + File.separator + 'Smc.jar'
+    // The below assumes that there is a file stored at bin/Smc.jar which is relative to the root project's directory
+    // statemapJarUri is the uri where you have put the statemap.jar file on your device.
+    // If you don't have this, or if you configure it wrong, then the SMC download site's version will be downloaded.
+    // The below assumes that there is a file stored at libs/statemap.jar which is relative to the root project's directory
+    statemapJarUri = 'file://' + rootProject.projectDir.absolutePath + File.separator + 'libs' + File.separator + 'statemap.jar'
+
+    // If the statemap.jar file gets downloaded, then it will be put here
+    libsDirectory = "libs"  // <-- the default, you should have dependencies { implementation fileTree(dir: 'libs', include: ['*.jar']) }
+    // This is the subdirectory containing the state machine sources--you can view it as though it is a source set
+    smSrcDir = "sm"         // <-- the default, you should have src/main/sm and then use a directory structure that matches your java package structure
+    graphVizLevel = 2       // <-- generated graphviz diagram (there are three levels of detail, 0, 1, and 2 and -1 means "don't generate")
+    outputHtmlTable = true  // <-- generate an HTML table representation
+}
+```
 
 ## Known Issues
 - In a java project, `./gradlew clean compileJava` results in missing the generated source at compile time (source files output by `generatedStateMachineSources` are not getting picked up by the subsequent `javaCompile` task). However, `./gradlew clean generateStateMachineSources; ./gradlew compileJava` work as separate commands. I'd like to fix this. Want to help?
