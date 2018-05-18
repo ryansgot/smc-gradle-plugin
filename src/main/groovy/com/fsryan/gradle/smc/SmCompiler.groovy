@@ -32,7 +32,7 @@ class SmCompiler {
         }
 
         try {
-            List<String> smFiles = new FileNameByRegexFinder().getFileNames(searchDir, /.*\.sm/)
+            List<String> smFiles = new FileNameByRegexFinder().getFileNames(searchDir, /.*\.sm$/)
             for (String smFile : smFiles) {
                 createOutputs(new SmcCommander(smcJarFile, smFile, javaOutputDir(smFile), outputDirFinder.getArtifactOutputDir()))
             }

@@ -1,14 +1,11 @@
 package com.fsryan.gradle.smc
 
 import org.gradle.api.*
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
 
 class SmcPlugin implements Plugin<Project> {
-
-    private static final String GET_SMC_TASK_NAME = "getSmc"
-
-    private static final String LOCAL_SMC_JAR_FILENAME = "Smc.jar"
-    private static final String LOCAL_STATEMAP_JAR_FILENAME = "statemap.jar"
 
     private static final String DEFAULT_SMC_DIR = "smc_6_6_0"
     private static final String SMC_JAR_ZIP_ENTRY_NAME = DEFAULT_SMC_DIR + File.separator + 'bin' + File.separator + 'Smc.jar'
@@ -16,106 +13,133 @@ class SmcPlugin implements Plugin<Project> {
     private static final String DEFAULT_SMC_ZIP = "smc_6_6_0.zip"
     /*package*/ static final String DEFAULT_SMC_URI = "http://pilotfiber.dl.sourceforge.net/project/smc/smc/6_6_0/" + DEFAULT_SMC_ZIP
 
+    @Override
     void apply(Project project) {
 
         project.extensions.create("smc", SmcExtension)
+        def getSmcTask = project.tasks.create(GetSmcTask.NAME, GetSmcTask)
 
-        project.task(GET_SMC_TASK_NAME) << {
-            UriChecker smcUriChecker = UriChecker.get(project.buildDir, LOCAL_SMC_JAR_FILENAME, (String) project.smc.smcUri)
-            if (smcUriChecker.ok()) {
-                project.smc.smcUri = smcUriChecker.prepareURI(false).toString()
+        if (isAndroidProject(project)) {
+            findAndroidVariants(project).all { v ->
+                def generationTask = createGenerationTask(project, v)
+                generationTask.dependsOn(getSmcTask)
+                v.registerJavaGeneratingTask(generationTask, generationTask.generatedSourceDir)
+                v.javaCompiler.dependsOn(generationTask)
             }
-            
-            File libsDirectory = new File((String) project.smc.libsDirectory)
-            UriChecker statemapUriChecker = UriChecker.get(libsDirectory, LOCAL_STATEMAP_JAR_FILENAME, (String) project.smc.statemapJarUri)
-            if (statemapUriChecker.ok()) {
-                project.smc.statemapJarUri = statemapUriChecker.prepareURI(true)
+        } else {    // <-- assume java for now
+            def generationTask = createGenerationTask(project, null)
+            generationTask.dependsOn(getSmcTask)
+            project.tasks.withType(JavaCompile).all { t ->
+                t.dependsOn(generationTask)
             }
-            
-            UnzipSummary us = new Unzipper(project.buildDir, libsDirectory).execute(!smcUriChecker.ok(), !statemapUriChecker.ok())
-            project.smc.smcUri = us.smcJarUri == null ? project.smc.smcUri : us.smcJarUri
-            project.smc.statemapJarUri = us.statemapJarUri == null ? project.smc.statemapJarUri : us.statemapJarUri
-        }
 
-        if (!isAndroidProject(project)) {
-            retrieveSourceSets(project).all { ss ->
+            retrieveSourceSets(project).findAll({ !it.name.contains('test') && !it.name.contains('Test') }).forEach { ss ->
                 // in a plain java project, this does not get added to a source directory by default
-                def generatedSrc = new File(project.buildDir, 'generated-src' + File.separator + 'java')
-                println "adding generated source to source set: $generatedSrc"
-                ss.java.srcDirs += generatedSrc
-            }
-        }
-
-        project.afterEvaluate {
-            if (!isAndroidProject(project)) {
-                createGenerationTask(project, null)
-            }
-            if (project.plugins.hasPlugin("com.android.application")) {
-                project.android.applicationVariants.all { v ->
-                    createGenerationTask(project, v)
-                }
-            }
-            if (project.plugins.hasPlugin("com.android.library")) {
-                project.android.libraryVariants.all { v ->
-                    createGenerationTask(project, v)
-                }
+                ss.java.srcDirs += generationTask.generatedSourceDir
             }
         }
     }
 
-    def createGenerationTask(p, v) {
+    static def findAndroidVariants(Project p) {
+        if (!isAndroidProject(p)) {
+            throw new IllegalArgumentException("Cannot get android variants if not Android project")
+        }
+        return p.android.hasProperty('applicationVariants') ? p.android.applicationVariants : p.android.libraryVariants
+    }
+
+    static def createGenerationTask(Project p, v) {
         File generatedSourceDir = getVariantSourceDir(p, v)
         String buildType = v == null ? null : v.buildType.name
         String flavor = v == null ? null : v.flavorName
         String taskName = generateStateMachineSourcesTaskName(buildType, flavor)
-        p.task(taskName) << {
-            performGenerateTask(p, buildType, flavor, generatedSourceDir)
-        }
-        p.getTasksByName(taskName, false).each { t ->
-            if (v != null) {
-                v.registerJavaGeneratingTask(t, generatedSourceDir)
-            }
-            t.dependsOn(GET_SMC_TASK_NAME)
-        }
-
-        if (v != null) {
-            v.javaCompiler.dependsOn(taskName)
-        } else {
-            p.getTasks().withType(JavaCompile).all { t ->
-                t.dependsOn(taskName)
-            }
+        return p.tasks.create(taskName, GenerateStateMachineCodeTask) { t ->
+            t.generatedSourceDir = generatedSourceDir
+            t.buildFlavorName = flavor
+            t.buildTypeName = buildType
         }
     }
 
-    private void performGenerateTask(Project p, String buildTypeName, String buildFlavorName, File generatedSourceDir) {
-        String smcJarFile = new File(new URI(p.smc.smcUri).path)
-        retrieveSourceSets(p).all { ss ->
-            for (String dir : ss.java.srcDirs) {
-                SmOutputDirFinder outputDirFinder = new SmOutputDirFinder(buildTypeName, p.buildDir, dir, generatedSourceDir, p.smc.smSrcDir)
-                new SmCompiler(new File(dir), smcJarFile, outputDirFinder, (SmcExtension) p.smc).execute()
-            }
-        }
+    static SmcExtension smcExtOf(Project p) {
+        return p.extensions.findByType(SmcExtension)
     }
 
-    private String generateStateMachineSourcesTaskName(String buildTypeName, String flavorName) {
+    static String generateStateMachineSourcesTaskName(String buildTypeName, String flavorName) {
         buildTypeName = buildTypeName == null ? "" : buildTypeName.capitalize()
         flavorName = flavorName == null ? "" : flavorName.capitalize()
         return "generate${flavorName}${buildTypeName}StateMachineSources"
     }
 
-    def getVariantSourceDir(Project p, v) {
+    static def getVariantSourceDir(Project p, v) {
         if (!isAndroidProject(p)) {
-            return new File(p.buildDir, "generated-src" + File.separator + "java")
+            return new File(p.buildDir, "generated-src" + File.separator + smcExtOf(p).smSrcDir)
         }
-        File smOutputDir = new File(p.buildDir, "generated/source/" + p.smc.smSrcDir)
+        File smOutputDir = new File(p.buildDir, "generated" + File.separator + "source" + File.separator + smcExtOf(p).smSrcDir)
         return new File(smOutputDir, v.dirName)
     }
 
-    def retrieveSourceSets(Project p) {
+    static def retrieveSourceSets(Project p) {
         return isAndroidProject(p) ? p.android.sourceSets : p.sourceSets
     }
 
-    private boolean isAndroidProject(Project p) {
-        return p.metaClass.hasProperty(p,'android')
+    static def isAndroidProject(Project project) {
+        return isAndroidApplication(project) || isAndroidLibrary(project)
+    }
+
+    static def isAndroidApplication(Project project) {
+        return project.plugins.hasPlugin("com.android.application")
+    }
+
+    static def isAndroidLibrary(Project project) {
+        return project.plugins.hasPlugin("com.android.library")
+    }
+}
+
+class GetSmcTask extends DefaultTask {
+
+    static final String NAME = "getSmc"
+
+    private static final String LOCAL_SMC_JAR_FILENAME = "Smc.jar"
+    private static final String LOCAL_STATEMAP_JAR_FILENAME = "statemap.jar"
+
+    @TaskAction
+    void getSmc() {
+        def smcExt = SmcPlugin.smcExtOf(project)
+        UriChecker smcUriChecker = UriChecker.get(project.buildDir, LOCAL_SMC_JAR_FILENAME, smcExt.smcUri)
+        if (smcUriChecker.ok()) {
+            smcExt.smcUri = smcUriChecker.prepareURI(false).toString()
+        }
+
+        File libsDirectory = new File(smcExt.libsDirectory)
+        UriChecker statemapUriChecker = UriChecker.get(libsDirectory, LOCAL_STATEMAP_JAR_FILENAME, smcExt.statemapJarUri)
+        if (statemapUriChecker.ok()) {
+            smcExt.statemapJarUri = statemapUriChecker.prepareURI(true)
+        }
+
+        UnzipSummary us = new Unzipper(project.buildDir, libsDirectory).execute(!smcUriChecker.ok(), !statemapUriChecker.ok())
+        smcExt.smcUri = us.smcJarUri == null ? smcExt.smcUri : us.smcJarUri
+        smcExt.statemapJarUri = us.statemapJarUri == null ? smcExt.statemapJarUri : us.statemapJarUri
+    }
+}
+
+class GenerateStateMachineCodeTask extends DefaultTask {
+
+    String buildTypeName
+    String buildFlavorName
+    @OutputDirectory
+    File generatedSourceDir
+
+    @TaskAction
+    void performGenerateTask() {
+        SmcExtension smcExt = SmcPlugin.smcExtOf(project)
+        String smcJarFile = new File(new URI(smcExt.smcUri).path)
+        SmcPlugin.retrieveSourceSets(project).all { ss ->
+            for (String dir : ss.java.srcDirs) {
+                if (new File(dir) == generatedSourceDir) {
+                    continue
+                }
+                SmOutputDirFinder outputDirFinder = new SmOutputDirFinder(buildTypeName, project.buildDir, dir, generatedSourceDir, smcExt.smSrcDir)
+                new SmCompiler(new File(dir), smcJarFile, outputDirFinder, smcExt).execute()
+            }
+        }
     }
 }
