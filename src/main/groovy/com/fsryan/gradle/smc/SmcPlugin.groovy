@@ -1,6 +1,7 @@
 package com.fsryan.gradle.smc
 
 import org.gradle.api.*
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
 
@@ -21,28 +22,20 @@ class SmcPlugin implements Plugin<Project> {
         if (isAndroidProject(project)) {
             findAndroidVariants(project).all { v ->
                 def generationTask = createGenerationTask(project, v)
-                println "adding $getSmcTask.name as dependency of $generationTask.name"
                 generationTask.dependsOn(getSmcTask)
                 v.registerJavaGeneratingTask(generationTask, generationTask.generatedSourceDir)
-
-                println "adding $generationTask.name as dependency of $v.javaCompiler"
                 v.javaCompiler.dependsOn(generationTask)
             }
         } else {    // <-- assume java for now
             def generationTask = createGenerationTask(project, null)
-            println "adding $getSmcTask.name as dependency of $generationTask.name"
             generationTask.dependsOn(getSmcTask)
             project.tasks.withType(JavaCompile).all { t ->
-                println "adding $generationTask.name as dependency of $t.name"
                 t.dependsOn(generationTask)
             }
-            retrieveSourceSets(project).all { ss ->
-                if (!ss.name.contains('test') && ss.name.contains('Test')) {
-                    // in a plain java project, this does not get added to a source directory by default
-                    def generatedSrc = new File(project.buildDir, 'generated-src' + File.separator + 'java')
-                    println "adding to source set $ss.name: $generatedSrc"
-                    ss.java.srcDirs += generatedSrc
-                }
+
+            retrieveSourceSets(project).findAll({ !it.name.contains('test') && !it.name.contains('Test') }).forEach { ss ->
+                // in a plain java project, this does not get added to a source directory by default
+                ss.java.srcDirs += generationTask.generatedSourceDir
             }
         }
     }
@@ -54,7 +47,7 @@ class SmcPlugin implements Plugin<Project> {
         return p.android.hasProperty('applicationVariants') ? p.android.applicationVariants : p.android.libraryVariants
     }
 
-    def createGenerationTask(Project p, v) {
+    static def createGenerationTask(Project p, v) {
         File generatedSourceDir = getVariantSourceDir(p, v)
         String buildType = v == null ? null : v.buildType.name
         String flavor = v == null ? null : v.flavorName
@@ -70,17 +63,17 @@ class SmcPlugin implements Plugin<Project> {
         return p.extensions.findByType(SmcExtension)
     }
 
-    private String generateStateMachineSourcesTaskName(String buildTypeName, String flavorName) {
+    static String generateStateMachineSourcesTaskName(String buildTypeName, String flavorName) {
         buildTypeName = buildTypeName == null ? "" : buildTypeName.capitalize()
         flavorName = flavorName == null ? "" : flavorName.capitalize()
         return "generate${flavorName}${buildTypeName}StateMachineSources"
     }
 
-    def getVariantSourceDir(Project p, v) {
+    static def getVariantSourceDir(Project p, v) {
         if (!isAndroidProject(p)) {
-            return new File(p.buildDir, "generated-src" + File.separator + "java")
+            return new File(p.buildDir, "generated-src" + File.separator + smcExtOf(p).smSrcDir)
         }
-        File smOutputDir = new File(p.buildDir, "generated/source/" + smcExtOf(p).smSrcDir)
+        File smOutputDir = new File(p.buildDir, "generated" + File.separator + "source" + File.separator + smcExtOf(p).smSrcDir)
         return new File(smOutputDir, v.dirName)
     }
 
@@ -103,8 +96,6 @@ class GetSmcTask extends DefaultTask {
     @TaskAction
     void getSmc() {
         def smcExt = SmcPlugin.smcExtOf(project)
-        println("getSmcTask found smc ext: $smcExt")
-
         UriChecker smcUriChecker = UriChecker.get(project.buildDir, LOCAL_SMC_JAR_FILENAME, smcExt.smcUri)
         if (smcUriChecker.ok()) {
             smcExt.smcUri = smcUriChecker.prepareURI(false).toString()
@@ -126,6 +117,7 @@ class GenerateStateMachineCodeTask extends DefaultTask {
 
     String buildTypeName
     String buildFlavorName
+    @OutputDirectory
     File generatedSourceDir
 
     @TaskAction
@@ -134,6 +126,9 @@ class GenerateStateMachineCodeTask extends DefaultTask {
         String smcJarFile = new File(new URI(smcExt.smcUri).path)
         SmcPlugin.retrieveSourceSets(project).all { ss ->
             for (String dir : ss.java.srcDirs) {
+                if (new File(dir) == generatedSourceDir) {
+                    continue
+                }
                 SmOutputDirFinder outputDirFinder = new SmOutputDirFinder(buildTypeName, project.buildDir, dir, generatedSourceDir, smcExt.smSrcDir)
                 new SmCompiler(new File(dir), smcJarFile, outputDirFinder, smcExt).execute()
             }
