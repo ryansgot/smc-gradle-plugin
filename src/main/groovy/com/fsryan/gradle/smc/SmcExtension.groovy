@@ -125,17 +125,4 @@ class SmcExtension {
      * </p>
      */
     boolean outputHtmlTable = false
-
-
-    @Override
-    String toString() {
-        return "SmcExtension{" +
-                "smcUri='" + smcUri + '\'' +
-                ", statemapJarUri='" + statemapJarUri + '\'' +
-                ", libsDirectory='" + libsDirectory + '\'' +
-                ", smSrcDir='" + smSrcDir + '\'' +
-                ", graphVizLevel=" + graphVizLevel +
-                ", outputHtmlTable=" + outputHtmlTable +
-                '}';
-    }
 }

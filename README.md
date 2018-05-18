@@ -24,8 +24,11 @@ This process is overly-manual when you have tools like gradle that are extensibl
 ## Support
 
 - Android
-- Java (see known issues below)
+- Java (supported--see known issues below)
 - Groovy (maybe)
 
 ## Known Issues
-- In a java project, `./gradlew clean compileJava` results in missing classes at compile time, but `./gradlew clean compileJava; ./gradlew compileJava` work as separate commands.
+- In a java project, `./gradlew clean compileJava` results in missing the generated source at compile time (source files output by `generatedStateMachineSources` are not getting picked up by the subsequent `javaCompile` task). However, `./gradlew clean generateStateMachineSources; ./gradlew compileJava` work as separate commands. I'd like to fix this. Want to help?
+
+## Suggestions?
+- Feel free to add an issue with a suggestion to make this better.
