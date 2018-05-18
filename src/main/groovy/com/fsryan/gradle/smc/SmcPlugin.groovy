@@ -81,8 +81,16 @@ class SmcPlugin implements Plugin<Project> {
         return isAndroidProject(p) ? p.android.sourceSets : p.sourceSets
     }
 
-    static boolean isAndroidProject(Project p) {
-        return p.metaClass.hasProperty(p,'android')
+    static def isAndroidProject(Project project) {
+        return isAndroidApplication(project) || isAndroidLibrary(project)
+    }
+
+    static def isAndroidApplication(Project project) {
+        return project.plugins.hasPlugin("com.android.application")
+    }
+
+    static def isAndroidLibrary(Project project) {
+        return project.plugins.hasPlugin("com.android.library")
     }
 }
 
