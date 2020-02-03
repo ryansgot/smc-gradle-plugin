@@ -36,7 +36,7 @@ class SmCompiler {
         try {
             List<String> smFiles = new FileNameByRegexFinder().getFileNames(searchDir, /.*\.sm$/)
             for (String smFile : smFiles) {
-                createOutputs(new SmcCommander(smcJarFile, smFile, javaOutputDir(smFile), outputDirFinder.getArtifactOutputDir()))
+                createOutputs(new SmcCommander(smcJarFile, smFile, javaOutputDir(searchDir, smFile), outputDirFinder.getArtifactOutputDir()))
             }
         } catch (FileNotFoundException fnfe) {
             println "not found: " + searchDir
@@ -60,9 +60,9 @@ class SmCompiler {
         return graphVizLevel >= 0
     }
 
-    private File javaOutputDir(String smFilePath) {
+    private File javaOutputDir(String searchDir, String smFilePath) {
         File smFileParent = new File(smFilePath).parentFile
-        String packagePath = smFileParent.absolutePath.substring(srcDir.absolutePath.length() - 1)
+        String packagePath = smFileParent.absolutePath.substring(searchDir.length() + 1)
         File ret = new File(outputDirFinder.getSrcOutputDir(), packagePath)
         return ret
     }
