@@ -7,7 +7,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 group 'com.fsryan.gradle.smc'
-version '0.0.2'
+version '0.1.0'
 
 repositories {
     mavenCentral()
@@ -32,9 +32,9 @@ bintray {
         licenses = ['Mozilla-1.1']
         vcsUrl = 'https://github.com/ryansgot/smc-gradle-plugin'
         version {
-            name = '0.0.2'
+            name = '0.1.0'
             released  = new Date()
-            vcsTag = 'v0.0.2'
+            vcsTag = 'v0.1.0'
         }
     }
 }
@@ -56,26 +56,6 @@ def pomConfig = {
     }
 }
 
-publishing {
-    publications {
-        smcPluginPublication(MavenPublication) {
-            from components.java
-            artifact sourcesJar
-            artifact javadocJar
-            groupId 'com.fsryan.gradle.smc'
-            artifactId 'smc'
-            version '0.0.2'
-            pom.withXml {
-                def root = asNode()
-                root.appendNode('description', 'Gradle plugin for the State Machine Compiler (SMC) that makes it easier to use in a gradle project')
-                root.appendNode('name', 'smc-gradle-plugin')
-                root.appendNode('url', 'https://github.com/ryansgot/smc-gradle-plugin')
-                root.children().last() + pomConfig
-            }
-        }
-    }
-}
-
 task release(dependsOn: bintrayUpload) {
     doLast {
         println("Huzzah! smc-gradle-plugin was uploaded to bintray!")
@@ -90,4 +70,24 @@ task sourcesJar(type: Jar) {
 task javadocJar(type: Jar, dependsOn: javadoc) {
     classifier = 'javadoc'
     from javadoc.destinationDir
+}
+
+publishing {
+    publications {
+        smcPluginPublication(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            groupId 'com.fsryan.gradle.smc'
+            artifactId 'smc'
+            version '0.1.0'
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('description', 'Gradle plugin for the State Machine Compiler (SMC) that makes it easier to use in a gradle project')
+                root.appendNode('name', 'smc-gradle-plugin')
+                root.appendNode('url', 'https://github.com/ryansgot/smc-gradle-plugin')
+                root.children().last() + pomConfig
+            }
+        }
+    }
 }

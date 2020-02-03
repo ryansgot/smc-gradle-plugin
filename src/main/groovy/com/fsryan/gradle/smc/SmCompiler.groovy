@@ -1,5 +1,7 @@
 package com.fsryan.gradle.smc
 
+import java.util.concurrent.TimeUnit
+
 class SmCompiler {
 
     private File srcDir
@@ -42,7 +44,10 @@ class SmCompiler {
     }
 
     private void createOutputs(SmcCommander commander) {
-        commander.generateStateMachine().execute()
+        def successful = commander.generateStateMachine().execute().waitFor(15000, TimeUnit.MILLISECONDS)
+        if (!successful) {
+            throw new IllegalStateException("Failed to create state machine Java file after 15 seconds in output directory: ${commander.artifactOutputDir}")
+        }
         if (generateDotFile()) {
             commander.generateDotFile(graphVizLevel).execute()
         }
