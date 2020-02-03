@@ -18,37 +18,43 @@ class Unzipper {
     }
 
     UnzipSummary execute(boolean extractSmcJar, boolean extractStatemapJar) throws IOException {
-        int numFilesToExtract = extractSmcJar && extractStatemapJar ? 2 : extractSmcJar || extractStatemapJar ? 1 : 0
-        if (numFilesToExtract == 0) {
+        if (!extractSmcJar && !extractStatemapJar) {
             return new UnzipSummary(null, null);
         }
+
+        boolean extractedSmcJar = false
+        boolean extractedStatemapJar = false
+
+        Exception exceptionEncountered = null
 
         UnzipSummary ret = new UnzipSummary(null, null)
         InputStream dl = null
         BufferedInputStream bin = null
         ZipInputStream zin = null
-        int numFilesExtracted = 0
         try {
             dl = findRealZipUrl(new URL(SmcPlugin.DEFAULT_SMC_URI)).openStream()
             bin = new BufferedInputStream(dl)
             ZipEntry ze = null
             zin = new ZipInputStream(bin)
             while ((ze = zin.getNextEntry()) != null) {
+                logger.log(Level.INFO, "Inspecting file in downloaded zip: ${ze.name}")
                 if (ze.getName().equals(SmcPlugin.SMC_JAR_ZIP_ENTRY_NAME) && extractSmcJar) {
+                    logger.log(Level.INFO, "Found Smc.jar file in downloaded zip")
                     ret.smcJarUri = extractFromZip(zin, ze, new File(buildDir.absolutePath + File.separator + "Smc.jar"))
-                    numFilesExtracted++
+                    extractedSmcJar = true
                 }
                 if (ze.getName().equals(SmcPlugin.STATEMAP_JAR_ZIP_ENTRY_NAME) && extractStatemapJar) {
+                    logger.log(Level.INFO, "Found statemap.jar file in downloaded zip")
                     ret.statemapJarUri = extractFromZip(zin, ze, new File(statemapJarDestinationDir.absolutePath + File.separator + "statemap.jar"))
-                    numFilesExtracted++
+                    extractedStatemapJar = true
                 }
-                if (numFilesToExtract == numFilesExtracted) {
+                if (extractSmcJar == extractedSmcJar && extractStatemapJar == extractedStatemapJar) {
                     break
                 }
             }
-        } catch (IOException ioe) {
-            logger.log(Level.ALL, "failed to download/extract zip", ioe)
-            throw ioe
+        } catch (Exception e) {
+            exceptionEncountered = e
+            logger.log(Level.ALL, "failed to download/extract zip", e)
         } finally {
             if (dl != null) {
                 dl.close()
@@ -61,8 +67,28 @@ class Unzipper {
             }
         }
 
-        if (numFilesToExtract != numFilesExtracted) {
-            throw new IllegalStateException("download and extraction unsuccessful")
+        if (extractSmcJar != extractedSmcJar) {
+            if (exceptionEncountered != null) {
+                logger.log(Level.ALL, "failed to extract Smc.jar file", exceptionEncountered)
+            } else {
+                logger.log(Level.ALL, "failed to extract Smc.jar file with no exception encountered")
+            }
+        }
+
+        if (extractedStatemapJar != extractedStatemapJar) {
+            if (exceptionEncountered != null) {
+                logger.log(Level.ALL, "failed to extract statemap.jar file", exceptionEncountered)
+            } else {
+                logger.log(Level.ALL, "failed to extract statemap.jar file with no exception encountered")
+            }
+        }
+
+        if (extractSmcJar != extractedSmcJar || extractedStatemapJar != extractedStatemapJar) {
+            if (exceptionEncountered != null) {
+                logger.log(Level.ALL, "download and extraction unsuccessful", exceptionEncountered)
+            } else {
+                throw new IllegalStateException("download and extraction unsuccessful")
+            }
         }
 
         return ret
