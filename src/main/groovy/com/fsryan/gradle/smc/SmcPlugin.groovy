@@ -132,7 +132,8 @@ class GenerateStateMachineCodeTask extends DefaultTask {
     void performGenerateTask() {
         SmcExtension smcExt = SmcPlugin.smcExtOf(project)
         String smcJarFile = new File(new URI(smcExt.smcUri).path)
-        SmcPlugin.retrieveSourceSets(project).all { ss ->
+        SmcPlugin.retrieveSourceSets(project).forEach { ss ->
+
             for (String dir : ss.java.srcDirs) {
                 if (new File(dir) == generatedSourceDir) {
                     continue
