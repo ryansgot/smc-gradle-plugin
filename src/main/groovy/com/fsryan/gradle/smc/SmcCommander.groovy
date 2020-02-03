@@ -4,8 +4,8 @@ class SmcCommander {
 
     private String smcJarFile
     private String inputFile
-    private File javaOutputDir
-    private File artifactOutputDir
+    File javaOutputDir
+    File artifactOutputDir
 
     SmcCommander(String smcJarFile, String inputFile, File javaOutputDir, File artifactOutputDir) {
         this.smcJarFile = smcJarFile
