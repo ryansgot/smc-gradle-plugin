@@ -23,9 +23,13 @@ This process is overly-manual when you have tools like gradle that are extensibl
 
 ## Support
 
-- Android
-- Java (supported--see known issues below)
+- Android (Java/Kotlin)
+- Java
+- Kotlin
 - Groovy (maybe)
+
+## How to use
+The smc-gradle-plugin affects the task dependency graph automatically for you with the necessary tasks to download and extract the necessary jar files for producing and linking the statemap library code for you. It also contains a task for running the Smc.jar. Because of this, all you have to do is apply the plugin in your project. The only stipulation is the smc gradle plugin needs to be applied after the android application/library or java plugin.
 
 ## Gradle Setup
 Add the following to your root project's build.gradle file:
@@ -35,7 +39,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.fsryan.gradle.smc:smc:0.0.2'
+        classpath 'com.fsryan.gradle.smc:smc:0.1.0'
     }
 }
 ```
@@ -64,9 +68,6 @@ smc {
     outputHtmlTable = true  // <-- generate an HTML table representation
 }
 ```
-
-## Known Issues
-- In a java project, `./gradlew clean compileJava` results in missing the generated source at compile time (source files output by `generatedStateMachineSources` are not getting picked up by the subsequent `javaCompile` task). However, `./gradlew clean generateStateMachineSources; ./gradlew compileJava` work as separate commands. I'd like to fix this. Want to help?
 
 ## Suggestions?
 - Feel free to add an issue with a suggestion to make this better.
