@@ -36,7 +36,7 @@ Add the following to your root project's build.gradle file:
 ```groovy
 buildscript {
     repositories {
-        jcenter()
+        mavenCentral()
     }
     dependencies {
         classpath 'com.fsryan.gradle.smc:smc:0.1.0'
