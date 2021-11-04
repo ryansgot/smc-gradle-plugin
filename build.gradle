@@ -4,7 +4,7 @@ apply plugin: 'maven-publish'
 apply plugin: 'signing'
 
 group 'com.fsryan.gradle.smc'
-version '0.1.0'
+version '0.2.0'
 
 repositories {
     mavenCentral()
