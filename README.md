@@ -4,6 +4,14 @@ Gradle plugin for the State Machine Compiler (SMC) that makes it easier to use i
 ## What is the State Machine Compiler?
 The SMC project is hosted on sourceforge here: http://smc.sourceforge.net/. It serves to generate state machine code for you via supplying a DSL. Please see the website for more information.
 
+## Version compatibility
+
+|--|--|
+| Gradle Version | SMC Plugin Version |
+|--|--|
+| < 7.0 | any |
+| 7.0+ | 0.2+ |
+
 ## Why Make a plugin for it?
 Normally, use of SMC involves:
 
@@ -39,7 +47,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.fsryan.gradle.smc:smc:0.1.0'
+        classpath 'com.fsryan.gradle.smc:smc:0.2.0'
     }
 }
 ```
