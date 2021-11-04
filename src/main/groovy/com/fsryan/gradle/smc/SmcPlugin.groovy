@@ -1,6 +1,7 @@
 package com.fsryan.gradle.smc
 
 import org.gradle.api.*
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
@@ -123,7 +124,9 @@ class GetSmcTask extends DefaultTask {
 
 class GenerateStateMachineCodeTask extends DefaultTask {
 
+    @Internal
     String buildTypeName
+    @Internal
     String buildFlavorName
     @OutputDirectory
     File generatedSourceDir
